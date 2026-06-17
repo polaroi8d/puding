@@ -28,7 +28,7 @@ jobs:
             printf '</head><body><h1>puding results</h1><ul>\n'
             for dir in models/*/; do
               name=$(basename "$dir")
-              src="$dir/app/src/index.html"
+              src="$dir/app/index.html"
               if [ -f "$src" ]; then
                 mkdir -p "_site/$name"
                 cp "$src" "_site/$name/index.html"

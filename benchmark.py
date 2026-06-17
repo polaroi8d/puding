@@ -196,13 +196,13 @@ def fmt(val, suffix="", precision=2):
 def write_summary(all_metrics: list[dict]) -> Path:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     path = RESULTS_DIR / "summary.md"
-    store = RESULTS_DIR / "results.json"
 
     existing: dict[str, dict] = {}
-    if store.exists():
-        existing = {m["model"]: m for m in json.loads(store.read_text())}
+    if path.exists():
+        hit = re.search(r'<!--BENCHMARK_DATA:(.*?)-->', path.read_text(), re.DOTALL)
+        if hit:
+            existing = {entry["model"]: entry for entry in json.loads(hit.group(1))}
     existing.update({m["model"]: m for m in all_metrics})
-    store.write_text(json.dumps(list(existing.values()), indent=2))
 
     sorted_m = sorted(existing.values(), key=lambda m: (m.get("total_time") is None, m.get("total_time") or 0))
 
@@ -222,8 +222,7 @@ def write_summary(all_metrics: list[dict]) -> Path:
     content = f"""# LLM Benchmark Results
 
 **Task:** [Todo App PRD](../PRD.md) — vanilla JS single-file app
-**API:** {sorted_m[0]['api_url'] if sorted_m else 'N/A'}
-**Run date:** {run_date}
+**Last run date:** {run_date}
 **Models tested:** {len(sorted_m)}
 
 ## Results (sorted by total generation time)
@@ -242,6 +241,7 @@ def write_summary(all_metrics: list[dict]) -> Path:
 | **Speed** | Completion tokens ÷ total time |
 
 """
+    content += f"\n<!--BENCHMARK_DATA:{json.dumps(list(existing.values()))}-->\n"
     path.write_text(content, encoding="utf-8")
     return path
 
