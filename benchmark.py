@@ -19,13 +19,42 @@ from pathlib import Path
 
 from openai import OpenAI
 from rich.console import Console
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 from rich.table import Table
 
 SCRIPT_DIR = Path(__file__).parent
-PRD_PATH = SCRIPT_DIR / "PRD.md"
+PROMPTS_DIR = SCRIPT_DIR / "prompts"
 MODELS_DIR = SCRIPT_DIR / "models"
-RESULTS_DIR = SCRIPT_DIR / "results"
+SUMMARY_PATH = SCRIPT_DIR / "summary.md"
+
+DEFAULT_SYSTEM = (
+    "You are an expert web developer. "
+    "Implement exactly what the spec says. "
+    "Output the file as a fenced html code block. No extra commentary."
+)
+
+
+def load_prompt(slug_or_path: str) -> tuple[str, dict]:
+    path = Path(slug_or_path)
+    if not path.exists():
+        path = PROMPTS_DIR / f"{slug_or_path}.md"
+    text = path.read_text(encoding="utf-8")
+    meta: dict = {}
+    if text.startswith("---\n"):
+        end = text.index("\n---\n", 4)
+        for line in text[4:end].splitlines():
+            if ": " in line:
+                k, v = line.split(": ", 1)
+                meta[k.strip()] = v.strip()
+        text = text[end + 5 :]
+    return text, meta
+
 
 console = Console()
 
@@ -36,11 +65,11 @@ KNOWN_FILES = [
 ]
 
 FILENAME_COMMENT_RE = re.compile(
-    r'^(?://|<!--|#|/\*)\s*([\w./\-]+\.\w+)(?:\s*-->|\s*\*/)?\s*$',
+    r"^(?://|<!--|#|/\*)\s*([\w./\-]+\.\w+)(?:\s*-->|\s*\*/)?\s*$",
     re.MULTILINE,
 )
-FENCED_BLOCK_RE = re.compile(r'```(?P<lang>\w*)\n(?P<body>.*?)```', re.DOTALL)
-BRACKET_FILENAME_RE = re.compile(r'\[([^\]]+\.\w+)\]')
+FENCED_BLOCK_RE = re.compile(r"```(?P<lang>\w*)\n(?P<body>.*?)```", re.DOTALL)
+BRACKET_FILENAME_RE = re.compile(r"\[([^\]]+\.\w+)\]")
 
 
 def extract_files(response_text: str) -> dict[str, str]:
@@ -50,7 +79,7 @@ def extract_files(response_text: str) -> dict[str, str]:
     for match in FENCED_BLOCK_RE.finditer(response_text):
         lang = match.group("lang").lower()
         body = match.group("body")
-        preceding = response_text[max(0, match.start() - 200):match.start()]
+        preceding = response_text[max(0, match.start() - 200) : match.start()]
         fname = None
 
         bracket = BRACKET_FILENAME_RE.findall(preceding)
@@ -58,7 +87,9 @@ def extract_files(response_text: str) -> dict[str, str]:
             fname = bracket[-1]
 
         if not fname:
-            heading = re.findall(r'(?:\*\*|`)?([^\s`*\n]+\.[a-z]+)(?:\*\*|`)?\s*$', preceding.strip())
+            heading = re.findall(
+                r"(?:\*\*|`)?([^\s`*\n]+\.[a-z]+)(?:\*\*|`)?\s*$", preceding.strip()
+            )
             if heading:
                 fname = heading[-1]
 
@@ -70,7 +101,11 @@ def extract_files(response_text: str) -> dict[str, str]:
                 body = "\n".join(body.split("\n")[1:])
 
         if not fname:
-            if lang == "html" and "index.html" not in used_known and "<!DOCTYPE" in body:
+            if (
+                lang == "html"
+                and "index.html" not in used_known
+                and "<!DOCTYPE" in body
+            ):
                 fname = "index.html"
 
         if fname:
@@ -83,11 +118,14 @@ def extract_files(response_text: str) -> dict[str, str]:
 
 # ── Benchmark runner ───────────────────────────────────────────────────────────
 
+
 def sanitize_model_name(model: str) -> str:
-    return re.sub(r'[/:]+', '-', model).strip('-')
+    return re.sub(r"[/:]+", "-", model).strip("-")
 
 
-def run_benchmark(model: str, prd: str, api_url: str) -> dict:
+def run_benchmark(
+    model: str, prd: str, api_url: str, system_prompt: str = DEFAULT_SYSTEM
+) -> dict:
     client = OpenAI(base_url=f"{api_url.rstrip('/')}/v1", api_key="benchmark")
 
     metrics: dict = {
@@ -123,14 +161,7 @@ def run_benchmark(model: str, prd: str, api_url: str) -> dict:
         stream = client.chat.completions.create(
             model=model,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an expert web developer. "
-                        "Implement exactly what the spec says. "
-                        "Output the file as a fenced html code block. No extra commentary."
-                    ),
-                },
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prd},
             ],
             stream=True,
@@ -175,8 +206,15 @@ def run_benchmark(model: str, prd: str, api_url: str) -> dict:
 
 # ── Output writers ─────────────────────────────────────────────────────────────
 
-def write_app_files(model_slug: str, files: dict[str, str]) -> Path:
-    app_dir = MODELS_DIR / model_slug / "app"
+
+def write_app_files(
+    model_slug: str, files: dict[str, str], prompt_slug: str = ""
+) -> Path:
+    app_dir = (
+        MODELS_DIR / model_slug / prompt_slug / "app"
+        if prompt_slug
+        else MODELS_DIR / model_slug / "app"
+    )
     for rel_path, content in files.items():
         dest = app_dir / rel_path
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -192,23 +230,34 @@ def fmt(val, suffix="", precision=2):
     return f"{val}{suffix}"
 
 
-
-def write_summary(all_metrics: list[dict]) -> Path:
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = RESULTS_DIR / "summary.md"
-
+def write_summary(all_metrics: list[dict], prompt_slug: str, prompt_title: str) -> Path:
     existing: dict[str, dict] = {}
-    if path.exists():
-        hit = re.search(r'<!--BENCHMARK_DATA:(.*?)-->', path.read_text(), re.DOTALL)
+    if SUMMARY_PATH.exists():
+        hit = re.search(
+            r"<!--BENCHMARK_DATA:(.*?)-->", SUMMARY_PATH.read_text(), re.DOTALL
+        )
         if hit:
-            existing = {entry["model"]: entry for entry in json.loads(hit.group(1))}
-    existing.update({m["model"]: m for m in all_metrics})
+            existing = {e["_key"]: e for e in json.loads(hit.group(1))}
 
-    sorted_m = sorted(existing.values(), key=lambda m: (m.get("total_time") is None, m.get("total_time") or 0))
+    for m in all_metrics:
+        m["prompt"] = prompt_slug
+        m["prompt_title"] = prompt_title
+        m["_key"] = f"{m['model']}||{prompt_slug}"
+    existing.update({m["_key"]: m for m in all_metrics})
+
+    sorted_m = sorted(
+        existing.values(),
+        key=lambda m: (
+            m.get("prompt", ""),
+            m.get("total_time") is None,
+            m.get("total_time") or 0,
+        ),
+    )
 
     rows = ""
     for m in sorted_m:
         rows += (
+            f"| {m.get('prompt_title', m.get('prompt', '—'))} "
             f"| {m['model']} "
             f"| {fmt(m['ttft'], 's')} "
             f"| {fmt(m['total_time'], 's')} "
@@ -221,14 +270,13 @@ def write_summary(all_metrics: list[dict]) -> Path:
     run_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     content = f"""# LLM Benchmark Results
 
-**Task:** [Todo App PRD](../PRD.md) — vanilla JS single-file app
 **Last run date:** {run_date}
-**Models tested:** {len(sorted_m)}
+**Entries:** {len(sorted_m)}
 
-## Results (sorted by total generation time)
+## Results
 
-| Model | TTFT | Total Time | Prompt Tok | Completion Tok | Total Tok | Speed |
-|-------|------|------------|------------|----------------|-----------|-------|
+| Prompt | Model | TTFT | Total Time | Prompt Tok | Completion Tok | Total Tok | Speed |
+|--------|-------|------|------------|------------|----------------|-----------|-------|
 {rows}
 ## Metric Definitions
 
@@ -236,20 +284,24 @@ def write_summary(all_metrics: list[dict]) -> Path:
 |--------|-------------|
 | **TTFT** | Time to First Token — latency before output starts |
 | **Total Time** | Wall-clock generation time (request → last token) |
-| **Prompt Tok** | Tokens consumed by PRD + system message |
+| **Prompt Tok** | Tokens consumed by the prompt + system message |
 | **Completion Tok** | Tokens the model generated |
 | **Speed** | Completion tokens ÷ total time |
 
 """
     content += f"\n<!--BENCHMARK_DATA:{json.dumps(list(existing.values()))}-->\n"
-    path.write_text(content, encoding="utf-8")
-    return path
+    SUMMARY_PATH.write_text(content, encoding="utf-8")
+    return SUMMARY_PATH
 
 
 # ── Rich terminal table ────────────────────────────────────────────────────────
 
+
 def print_summary_table(all_metrics: list[dict]):
-    table = Table(title="Benchmark Results", show_header=True, header_style="bold magenta")
+    table = Table(
+        title="Benchmark Results", show_header=True, header_style="bold magenta"
+    )
+    table.add_column("Prompt", style="yellow", no_wrap=True)
     table.add_column("Model", style="cyan", no_wrap=True)
     table.add_column("TTFT", justify="right")
     table.add_column("Total", justify="right")
@@ -257,8 +309,12 @@ def print_summary_table(all_metrics: list[dict]):
     table.add_column("Compl tok", justify="right")
     table.add_column("tok/s", justify="right")
 
-    for m in sorted(all_metrics, key=lambda x: (x.get("total_time") is None, x.get("total_time") or 0)):
+    for m in sorted(
+        all_metrics,
+        key=lambda x: (x.get("total_time") is None, x.get("total_time") or 0),
+    ):
         table.add_row(
+            m.get("prompt_title", m.get("prompt", "—")),
             m["model"],
             fmt(m["ttft"], "s"),
             fmt(m["total_time"], "s"),
@@ -272,9 +328,12 @@ def print_summary_table(all_metrics: list[dict]):
 
 # ── List ───────────────────────────────────────────────────────────────────────
 
+
 def list_models():
     if not MODELS_DIR.exists():
-        console.print("[yellow]No models directory yet — run a benchmark first.[/yellow]")
+        console.print(
+            "[yellow]No models directory yet — run a benchmark first.[/yellow]"
+        )
         return
     models = [d.name for d in MODELS_DIR.iterdir() if d.is_dir()]
     if not models:
@@ -285,51 +344,106 @@ def list_models():
         console.print(f"  • {m}")
 
 
+def list_prompts():
+    if not PROMPTS_DIR.exists():
+        console.print("[yellow]No prompts directory found.[/yellow]")
+        return
+    files = sorted(PROMPTS_DIR.glob("*.md"))
+    if not files:
+        console.print("[yellow]No prompts found in prompts/.[/yellow]")
+        return
+    console.print("[bold]Available prompts:[/bold]")
+    for f in files:
+        _, meta = load_prompt(str(f))
+        title = meta.get("title", f.stem)
+        console.print(f"  • [cyan]{f.stem}[/cyan]  {title}")
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
+
 def main():
-    parser = argparse.ArgumentParser(description="LLM benchmark against PRD.md")
-    parser.add_argument("--models", nargs="+", metavar="MODEL", help="Model IDs to benchmark")
-    parser.add_argument("--url", default="http://localhost:9999", help="OpenAI-compatible API base URL")
-    parser.add_argument("--list-models", action="store_true", help="List previously benchmarked models")
-    parser.add_argument("--no-extract", action="store_true", help="Skip file extraction")
+    parser = argparse.ArgumentParser(
+        description="LLM benchmark — runs a prompt against one or more models"
+    )
+    parser.add_argument(
+        "--models", nargs="+", metavar="MODEL", help="Model IDs to benchmark"
+    )
+    parser.add_argument(
+        "--prompt",
+        metavar="SLUG",
+        help="Prompt to use (slug from prompts/, e.g. todo-app)",
+    )
+    parser.add_argument(
+        "--url", default="http://localhost:9999", help="OpenAI-compatible API base URL"
+    )
+    parser.add_argument(
+        "--list-models", action="store_true", help="List previously benchmarked models"
+    )
+    parser.add_argument(
+        "--list-prompts", action="store_true", help="List available prompts"
+    )
+    parser.add_argument(
+        "--no-extract", action="store_true", help="Skip file extraction"
+    )
     args = parser.parse_args()
 
     if args.list_models:
         list_models()
         return
 
+    if args.list_prompts:
+        list_prompts()
+        return
+
     if not args.models:
         parser.print_help()
         sys.exit(1)
 
-    if not PRD_PATH.exists():
-        console.print(f"[red]PRD not found: {PRD_PATH}[/red]")
+    if not args.prompt:
+        console.print(
+            "[red]--prompt is required. Use --list-prompts to see available options.[/red]"
+        )
+        list_prompts()
         sys.exit(1)
 
-    prd = PRD_PATH.read_text(encoding="utf-8")
+    try:
+        prd, meta = load_prompt(args.prompt)
+    except FileNotFoundError:
+        console.print(f"[red]Prompt not found: {args.prompt}[/red]")
+        list_prompts()
+        sys.exit(1)
+
+    prompt_slug = Path(args.prompt).stem if Path(args.prompt).exists() else args.prompt
+    prompt_title = meta.get("title", prompt_slug)
+    system_prompt = meta.get("system", DEFAULT_SYSTEM)
+
     all_metrics: list[dict] = []
 
     for model in args.models:
         slug = sanitize_model_name(model)
         console.rule(f"[bold cyan]{model}[/bold cyan]")
 
-        metrics = run_benchmark(model, prd, args.url)
+        metrics = run_benchmark(model, prd, args.url, system_prompt)
 
         files: dict[str, str] = {}
         if not args.no_extract and not metrics.get("error"):
             files = extract_files(metrics.get("_response", ""))
 
         if files and not args.no_extract:
-            write_app_files(slug, files)
-            console.print(f"[green]Extracted {len(files)} file(s) → models/{slug}/app/[/green]")
+            app_dir = write_app_files(slug, files, prompt_slug)
+            console.print(
+                f"[green]Extracted {len(files)} file(s) → {app_dir.relative_to(SCRIPT_DIR)}[/green]"
+            )
 
         summary_metrics = {k: v for k, v in metrics.items() if k != "_response"}
         all_metrics.append(summary_metrics)
 
     if all_metrics:
-        summary_path = write_summary(all_metrics)
-        console.print(f"\n[dim]Summary → {summary_path.relative_to(SCRIPT_DIR)}[/dim]\n")
+        summary_path = write_summary(all_metrics, prompt_slug, prompt_title)
+        console.print(
+            f"\n[dim]Summary → {summary_path.relative_to(SCRIPT_DIR)}[/dim]\n"
+        )
         print_summary_table(all_metrics)
 
 

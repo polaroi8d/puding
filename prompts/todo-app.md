@@ -1,4 +1,8 @@
-# PRD — Todo App (Agent Build Task)
+---
+title: Todo App
+system: You are an expert web developer. Implement exactly what the spec says. Output the file as a fenced html code block. No extra commentary.
+---
+# PRD — Todo App
 
 ## How to read this
 You are an autonomous coding agent. This spec is complete — **do not ask
