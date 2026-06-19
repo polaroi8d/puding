@@ -1,0 +1,17 @@
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Pelican body -->
+  <path d="M100 80 Q110 70 120 80 Q140 90 130 120 Q120 150 100 150 Q80 150 70 120 Q60 90 80 80 Z" fill="orange" />
+
+  <!-- Pelican beak -->
+  <path d="M100 70 L107 75 L93 75 Z" fill="yellow" />
+
+  <!-- Bicycle frame -->
+  <path d="M70 120 Q70 140 90 140 L130 140 Q150 140 150 120" fill="black" stroke="black" stroke-width="3" />
+
+  <!-- Bicycle wheels -->
+  <circle cx="70" cy="150" r="10" fill="black" />
+  <circle cx="150" cy="150" r="10" fill="black" />
+
+  <!-- Pelican on the bicycle -->
+  <path d="M110 100 Q110 105 105 105 Q100 105 100 100 Q100 95 105 95 Q110 95 110 100 Z" transform="scale(0.8)" fill="orange" />
+</svg>

@@ -107,6 +107,8 @@ def extract_files(response_text: str) -> dict[str, str]:
                 and "<!DOCTYPE" in body
             ):
                 fname = "index.html"
+            elif lang in ("svg", "xml") and "<svg" in body:
+                fname = "output.svg"
 
         if fname:
             fname = fname.lstrip("./").replace("\\", "/")
@@ -429,6 +431,12 @@ def main():
         files: dict[str, str] = {}
         if not args.no_extract and not metrics.get("error"):
             files = extract_files(metrics.get("_response", ""))
+
+        raw_dir = MODELS_DIR / slug / prompt_slug / "app"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        (raw_dir / "pelican.svg").write_text(
+            metrics.get("_response", ""), encoding="utf-8"
+        )
 
         if files and not args.no_extract:
             app_dir = write_app_files(slug, files, prompt_slug)
