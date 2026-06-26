@@ -213,9 +213,9 @@ def write_app_files(
     model_slug: str, files: dict[str, str], prompt_slug: str = ""
 ) -> Path:
     app_dir = (
-        MODELS_DIR / model_slug / prompt_slug / "app"
+        MODELS_DIR / model_slug / prompt_slug
         if prompt_slug
-        else MODELS_DIR / model_slug / "app"
+        else MODELS_DIR / model_slug
     )
     for rel_path, content in files.items():
         dest = app_dir / rel_path
@@ -432,7 +432,7 @@ def main():
         if not args.no_extract and not metrics.get("error"):
             files = extract_files(metrics.get("_response", ""))
 
-        raw_dir = MODELS_DIR / slug / prompt_slug / "app"
+        raw_dir = MODELS_DIR / slug / prompt_slug
         raw_dir.mkdir(parents=True, exist_ok=True)
         (raw_dir / "pelican.svg").write_text(
             metrics.get("_response", ""), encoding="utf-8"

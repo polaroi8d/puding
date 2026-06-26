@@ -1,0 +1,47 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Todo App</title>
+        <style>
+            /* Basic styles */
+            body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+            .header { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+            #new-todo-input { flex: 1; padding: 0.5rem; }
+            #add-todo { padding: 0.5rem 1rem; }
+            .filters { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+            .filter-btn { padding: 0.25rem 0.5rem; cursor: pointer; }
+            .filter-btn.active { font-weight: bold; text-decoration: underline; }
+            #todo-list { list-style: none; padding: 0; margin: 0; }
+            .todo-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+            .todo-item[data-completed="true"] .todo-text { text-decoration: line-through; color: #888; }
+            .todo-text { flex: 1; }
+            .delete-todo { padding: 0.25rem 0.5rem; cursor: pointer; }
+            .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
+            #active-count { margin-right: 1rem; }
+            #clear-completed { padding: 0.25rem 0.5rem; cursor: pointer; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <input type="text" id="new-todo-input" data-testid="new-todo-input" placeholder="What needs to be done?">
+            <button id="add-todo" data-testid="add-todo">Add</button>
+        </div>
+        <div class="filters">
+            <button class="filter-btn active" data-testid="filter-all">All</button>
+            <button class="filter-btn" data-testid="filter-active">Active</button>
+            <button class="filter-btn" data-testid="filter-completed">Completed</button>
+        </div>
+        <ul id="todo-list" data-testid="todo-list"></ul>
+        <div class="footer">
+            <span id="active-count" data-testid="active-count">0</span>
+            <button id="clear-completed" data-testid="clear-completed">Clear completed</button>
+        </div>
+
+        <script>
+            // JS logic here
+        </script>
+    </body>
+    </html>
+    
