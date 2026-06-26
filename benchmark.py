@@ -434,15 +434,15 @@ def main():
 
         raw_dir = MODELS_DIR / slug / prompt_slug
         raw_dir.mkdir(parents=True, exist_ok=True)
-        (raw_dir / "pelican.svg").write_text(
-            metrics.get("_response", ""), encoding="utf-8"
-        )
 
         if files and not args.no_extract:
             app_dir = write_app_files(slug, files, prompt_slug)
             console.print(
                 f"[green]Extracted {len(files)} file(s) → {app_dir.relative_to(SCRIPT_DIR)}[/green]"
             )
+        elif metrics.get("_response"):
+            # ponytail: keep raw only when extraction found nothing (error / no fenced block)
+            (raw_dir / "response.md").write_text(metrics["_response"], encoding="utf-8")
 
         summary_metrics = {k: v for k, v in metrics.items() if k != "_response"}
         all_metrics.append(summary_metrics)
