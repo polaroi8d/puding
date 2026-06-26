@@ -1,0 +1,15 @@
+{
+  "model": "openai/gpt-oss-20b",
+  "timestamp": "2026-06-26T11:30:15.764241+00:00",
+  "api_url": "http://localhost:9999",
+  "ttft": 9.476,
+  "total_time": 36.043,
+  "prompt_tokens": 1146,
+  "completion_tokens": 1613,
+  "total_tokens": 2759,
+  "tokens_per_sec": 44.8,
+  "response_chars": 4896,
+  "error": null,
+  "prompt": "todo-app",
+  "prompt_title": "Todo App"
+}

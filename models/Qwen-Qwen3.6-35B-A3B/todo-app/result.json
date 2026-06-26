@@ -1,0 +1,15 @@
+{
+  "model": "Qwen/Qwen3.6-35B-A3B",
+  "timestamp": "2026-06-18T06:30:58.308019+00:00",
+  "api_url": "http://localhost:9999",
+  "ttft": 2.129,
+  "total_time": 87.112,
+  "prompt_tokens": 1122,
+  "completion_tokens": 2560,
+  "total_tokens": 3682,
+  "tokens_per_sec": 29.4,
+  "response_chars": 8718,
+  "error": null,
+  "prompt": "todo-app",
+  "prompt_title": "Todo App"
+}

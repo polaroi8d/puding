@@ -1,0 +1,15 @@
+{
+  "model": "Qwen/Qwen-AgentWorld-35B-A3B",
+  "timestamp": "2026-06-26T10:27:55.145464+00:00",
+  "api_url": "http://localhost:9999",
+  "ttft": 1.442,
+  "total_time": 528.341,
+  "prompt_tokens": 65,
+  "completion_tokens": 15552,
+  "total_tokens": 15617,
+  "tokens_per_sec": 29.4,
+  "response_chars": 33655,
+  "error": null,
+  "prompt": "svg-pelican",
+  "prompt_title": "SVG Pelican on a Bicycle"
+}

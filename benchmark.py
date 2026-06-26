@@ -232,23 +232,14 @@ def fmt(val, suffix="", precision=2):
     return f"{val}{suffix}"
 
 
-def write_summary(all_metrics: list[dict], prompt_slug: str, prompt_title: str) -> Path:
-    existing: dict[str, dict] = {}
-    if SUMMARY_PATH.exists():
-        hit = re.search(
-            r"<!--BENCHMARK_DATA:(.*?)-->", SUMMARY_PATH.read_text(), re.DOTALL
-        )
-        if hit:
-            existing = {e["_key"]: e for e in json.loads(hit.group(1))}
+def load_results() -> list[dict]:
+    """Source of truth: one result.json per models/<model>/<prompt>/ folder."""
+    return [json.loads(p.read_text()) for p in MODELS_DIR.glob("*/*/result.json")]
 
-    for m in all_metrics:
-        m["prompt"] = prompt_slug
-        m["prompt_title"] = prompt_title
-        m["_key"] = f"{m['model']}||{prompt_slug}"
-    existing.update({m["_key"]: m for m in all_metrics})
 
+def write_summary() -> Path:
     sorted_m = sorted(
-        existing.values(),
+        load_results(),
         key=lambda m: (
             m.get("prompt", ""),
             m.get("total_time") is None,
@@ -291,7 +282,6 @@ def write_summary(all_metrics: list[dict], prompt_slug: str, prompt_title: str) 
 | **Speed** | Completion tokens ÷ total time |
 
 """
-    content += f"\n<!--BENCHMARK_DATA:{json.dumps(list(existing.values()))}-->\n"
     SUMMARY_PATH.write_text(content, encoding="utf-8")
     return SUMMARY_PATH
 
@@ -445,10 +435,16 @@ def main():
             (raw_dir / "response.md").write_text(metrics["_response"], encoding="utf-8")
 
         summary_metrics = {k: v for k, v in metrics.items() if k != "_response"}
+        summary_metrics["prompt"] = prompt_slug
+        summary_metrics["prompt_title"] = prompt_title
+        # One self-contained result per folder — the source of truth.
+        (raw_dir / "result.json").write_text(
+            json.dumps(summary_metrics, indent=2) + "\n", encoding="utf-8"
+        )
         all_metrics.append(summary_metrics)
 
     if all_metrics:
-        summary_path = write_summary(all_metrics, prompt_slug, prompt_title)
+        summary_path = write_summary()
         console.print(
             f"\n[dim]Summary → {summary_path.relative_to(SCRIPT_DIR)}[/dim]\n"
         )
