@@ -22,7 +22,7 @@ DESCRIPTION = (
     "I record speed and token usage, and keep the generated artifact "
     "(an SVG or a single-file app) so you can open it below."
     ""
-    "Github: https://github.com/polaroi8d/puding"
+    " Github: https://github.com/polaroi8d/puding"
 )
 
 COLS = [
@@ -56,6 +56,23 @@ def cell(val, suffix):
     return f"{val}{suffix}" if suffix else str(val)
 
 
+def copy_artifact(src, dst):
+    """Copy a result file. For SVGs, inject a full-bleed black background as the
+    first child so the pelican renders on black when opened directly."""
+    if src.suffix != ".svg":
+        shutil.copy(src, dst)
+        return
+    svg = src.read_text()
+    svg = re.sub(r"(<svg\b[^>]*>)",
+                 r'\1<rect width="100%" height="100%" fill="#000"/>',
+                 svg, count=1, flags=re.IGNORECASE)
+    dst.write_text(svg)
+
+
+assert '<rect' in re.sub(r"(<svg\b[^>]*>)", r'\1<rect/>',
+                         '<svg x="0"><g/></svg>', count=1), "bg injection regex broke"
+
+
 def main():
     by_key, titles = load_metrics()
     if SITE.exists():
@@ -74,7 +91,7 @@ def main():
         if entry:
             dest = SITE / model / prompt
             dest.mkdir(parents=True, exist_ok=True)
-            shutil.copy(entry, dest / entry.name)
+            copy_artifact(entry, dest / entry.name)
             link = f"{model}/{prompt}/{entry.name}"
         models.setdefault(model, {})[prompt] = link
         titles.setdefault(prompt, prompt)
