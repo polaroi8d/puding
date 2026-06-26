@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Todo App</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  .todo-item { display: flex; align-items: center; margin: 5px 0; }
+  .todo-item[data-completed="true"] .todo-text { text-decoration: line-through; color: #888; }
+  .todo-text { flex: 1; margin: 0 10px; }
+  .filters button { margin-right: 5px; }
+</style>
+</head>
+<body>
+<div>
+  <input type="text" id="newTodo" data-testid="new-todo-input" placeholder="Add a todo">
+  <button id="addBtn" data-testid="add-todo">Add</button>
+</div>
+<ul id="todoList" data-testid="todo-list"></ul>
+<div class="filters">
+  <button id="filterAll" data-testid="filter-all">All</button>
+  <button id="filterActive" data-testid="filter-active">Active</button>
+  <button id="filterCompleted" data-testid="filter-completed">Completed</button>
+</div>
+<div>
+  <span id="activeCount" data-testid="active-count">0</span> items left
+  <button id="clearCompleted" data-testid="clear-completed">Clear Completed</button>
+</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'todos';
+  let todos = [];
+  let filter = 'all';
+
+  const elements = {
+    input: document.querySelector('[data-testid="new-todo-input"]'),
+    addBtn: document.querySelector('[data-testid="add-todo"]'),
+    list: document.querySelector('[data-testid="todo-list"]'),
+    filterAll: document.querySelector('[data-testid="filter-all"]'),
+    filterActive: document.querySelector('[data-testid="filter-active"]'),
+    filterCompleted: document.querySelector('[data-testid="filter-completed"]'),
+    activeCount: document.querySelector('[data-testid="active-count"]'),
+    clearCompleted: document.querySelector('[data-testid="clear-completed"]')
+  };
+
+  function loadTodos() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) { return []; }
+      const parsed = JSON.parse(data);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(item => ({
+        id: item.id,
+        text: item.text,
+        completed: !!item.completed
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  function saveTodos() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+  }
+
+  function addTodo(text) {
+    const id = crypto.randomUUID();
+    todos.push({ id, text, completed: false });
+    saveTodos();
+  }
+
+  function deleteTodo(id) {
+    todos = todos.filter(t => t.id !== id);
+    saveTodos();
+  }
+
+  function toggleTodo(id) {
+    const todo = todos.find(t => t.id === id);
+    if (todo) {
+      todo.completed = !todo.completed;
+      saveTodos();
+    }
+  }
+
+  function clearCompletedTodos() {
+    todos = todos.filter(t => !t.completed);
+    saveTodos();
+  }
+
+  function render() {
+    elements.list.innerHTML = '';
+    const filtered = todos.filter(todo => {
+      if (filter === 'active') return !todo.completed;
+      if (filter === 'completed') return todo.completed;
+      return true;
+    });
+    filtered.forEach(todo => {
+      const li = document.createElement('li');
+      li.setAttribute('data-testid', 'todo-item');
+      li.setAttribute('data-completed', todo.completed ? 'true' : 'false');
+      li.className = 'todo-item';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.setAttribute('data-testid', 'toggle-todo');
+      checkbox.checked = todo.completed;
+      checkbox.addEventListener('change', () => {
+        toggleTodo(todo.id);
+        render();
+      });
+
+      const span = document.createElement('span');
+      span.setAttribute('data-testid', 'todo-text');
+      span.textContent = todo.text;
+
+      const delBtn = document.createElement('button');
+      delBtn.setAttribute('data-testid', 'delete-todo');
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', () => {
+        deleteTodo(todo.id);
+        render();
+      });
+
+      li.append(checkbox, span, delBtn);
+      elements.list.appendChild(li);
+    });
+
+    const activeCount = todos.filter(t => !t.completed).length;
+    elements.activeCount.textContent = activeCount;
+  }
+
+  // Event listeners
+  elements.addBtn.addEventListener('click', () => {
+    const raw = elements.input.value;
+    const trimmed = raw.trim();
+    if (trimmed) {
+      addTodo(trimmed);
+      elements.input.value = '';
+      render();
+    }
+  });
+
+  elements.input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') elements.addBtn.click();
+  });
+
+  elements.filterAll.addEventListener('click', () => { filter = 'all'; render(); });
+  elements.filterActive.addEventListener('click', () => { filter = 'active'; render(); });
+  elements.filterCompleted.addEventListener('click', () => { filter = 'completed'; render(); });
+
+  elements.clearCompleted.addEventListener('click', () => {
+    clearCompletedTodos();
+    render();
+  });
+
+  // Init
+  todos = loadTodos();
+  render();
+})();
+</script>
+</body>
+</html>
