@@ -21,6 +21,8 @@ DESCRIPTION = (
     "Each model gets the same coding prompts via an OpenAI-compatible API; "
     "I record speed and token usage, and keep the generated artifact "
     "(an SVG or a single-file app) so you can open it below."
+    ""
+    "Github: https://github.com/polaroi8d/puding"
 )
 
 COLS = [
